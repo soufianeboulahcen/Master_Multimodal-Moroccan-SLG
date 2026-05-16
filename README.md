@@ -1,55 +1,63 @@
 # Multimodal Moroccan Sign Language Generation
 
-A paper-faithful PyTorch reimplementation of **SignLLM** ([Fang et al., 2024](https://arxiv.org/abs/2405.10718)) trained on the **Moroccan Sign Language (MoSL)** video dataset, with a full OpenPose-style pose tracking and video generation pipeline.
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange)](https://pytorch.org)
-[![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10-green)](https://mediapipe.dev)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-
----
-
-## Table of Contents
-- [Overview](#overview)
-- [Results](#results)
-- [Repository Structure](#repository-structure)
-- [Quick Start](#quick-start)
-- [Pipeline Stages](#pipeline-stages)
-- [Generated Outputs](#generated-outputs)
-- [Dataset](#dataset)
-- [Git LFS](#git-lfs)
-- [Citation](#citation)
+A paper-faithful PyTorch reimplementation of **SignLLM** trained on the **MoSL** isolated-word dataset, extended with a full OpenPose-style skeleton tracking and video generation pipeline.
 
 ---
 
 ## Overview
 
-This project implements **Sign Language Production (SLP)** for Moroccan Sign Language (MoSL), used by ~300,000 people in Morocco.
-
-**Three components:**
-
-| Component | Description |
-|---|---|
-| **SignLLM** | Encoder-decoder transformer (2+2 layers, d_model=768, ~35M params) mapping Arabic text → 3D pose sequence |
-| **Pose extraction** | Per-frame 2D keypoints via pytorch-openpose → 3D lifting via Prompt2Sign |
-| **OpenPose demo pipeline** | 7-variant video generation: overlay, skeleton, neon, heatmap, slow-motion, studio, mosaic |
+| Phase | Description |
+|-------|-------------|
+| Dataset processing | Label extraction, train/val/test split, vocabulary |
+| Pose extraction | OpenPose keypoint extraction to NPZ per clip |
+| 2D to 3D lifting | Prompt2Sign `.skels` format conversion |
+| Model | SignLLM encoder-decoder transformer (35M params) |
+| Training | MSE / RL / RL+PLC ablation runs |
+| Evaluation | Teacher-forced MSE + autoregressive DTW vs baselines |
+| Visualization | OpenPose-style skeleton videos, GIFs, JSON keypoints |
 
 ---
 
 ## Results
 
-Autoregressive DTW on the MoSL test set (lower is better):
+**Test AR DTW (lower is better):**
 
-| Method | Dev DTW | Test DTW |
-|---|---:|---:|
-| Nearest-Neighbor (baseline) | 0.865 | **0.782** |
-| Mean-Pose (baseline) | **0.815** | 0.868 |
-| Random-Clip (baseline) | 0.974 | 0.962 |
-| **SignLLM MSE (best model)** | 1.022 | 1.045 |
-| SignLLM RL+PLC | 1.153 | 1.212 |
-| SignLLM RL | 1.307 | 1.318 |
+| Method | DTW |
+|--------|-----|
+| Nearest-Neighbor (baseline) | 0.7817 |
+| Mean-Pose (baseline) | 0.8682 |
+| Random-Clip (baseline) | 0.9620 |
+| SignLLM MSE | 1.0447 |
+| SignLLM RL+PLC | 1.2117 |
+| SignLLM RL | 1.3182 |
 
-> All three SignLLM configurations fail to outperform deterministic baselines on MoSL. Root cause: ~18× smaller dataset than the paper's ASL setting + isolated-word structure. See [`docs/RESULTS.md`](docs/RESULTS.md).
+![Training curves](images/training_curves.png)
+![Baseline comparison](images/baseline_comparison.png)
+
+---
+
+## Generated Outputs
+
+### Skeleton Tracking Videos
+
+Six motion types with full body, hand, and face tracking (1280x720, 30 fps):
+
+| Motion | Skeleton | Overlay | Slow-motion |
+|--------|----------|---------|-------------|
+| Walking | `outputs/videos/skeleton/walking_skeleton.mp4` | `outputs/videos/overlay/walking_overlay.mp4` | `outputs/videos/slowmo/walking_slowmo.mp4` |
+| Running | `outputs/videos/skeleton/running_skeleton.mp4` | `outputs/videos/overlay/running_overlay.mp4` | `outputs/videos/slowmo/running_slowmo.mp4` |
+| Dancing | `outputs/videos/skeleton/dancing_skeleton.mp4` | `outputs/videos/overlay/dancing_overlay.mp4` | `outputs/videos/slowmo/dancing_slowmo.mp4` |
+| Jumping | `outputs/videos/skeleton/jumping_skeleton.mp4` | `outputs/videos/overlay/jumping_overlay.mp4` | `outputs/videos/slowmo/jumping_slowmo.mp4` |
+| Hand & Face | `outputs/videos/skeleton/hand_face_skeleton.mp4` | `outputs/videos/overlay/hand_face_overlay.mp4` | `outputs/videos/slowmo/hand_face_slowmo.mp4` |
+| Waving | `outputs/videos/skeleton/waving_skeleton.mp4` | `outputs/videos/overlay/waving_overlay.mp4` | `outputs/videos/slowmo/waving_slowmo.mp4` |
+
+Visual effects: glow/bloom, cinematic letterbox bars, camera drift, animated studio background.
+
+### Visualizations
+
+![Predicted pose frames](images/predicted_frames.png)
+![Sample skeleton](images/sample_skeleton.png)
+![Predicted pose animation](images/predicted_pose.gif)
 
 ---
 
@@ -57,243 +65,157 @@ Autoregressive DTW on the MoSL test set (lower is better):
 
 ```
 .
-├── mosl/                        # Core Python package
-│   ├── data/                    # Dataset loading, splits, label extraction
-│   ├── model/                   # SignLLM architecture (signllm.py, positional.py)
-│   ├── pose/                    # Pose extraction pipeline
-│   ├── text/                    # Word-level Arabic tokenizer (NFC)
-│   └── train/                   # Training loop, losses, eval, scheduler
-│
-├── scripts/                     # CLI entry points
-│   ├── train_signllm.py         # Training launcher
-│   ├── predict.py               # Single-word inference
-│   ├── evaluate_runs.py         # Full dev+test evaluation
-│   ├── compute_baselines.py     # NN / mean-pose / random-clip baselines
-│   ├── generate_openpose_video.py   # Single-video OpenPose demo
-│   ├── multi_openpose_demo.py   # Multi-video 7-variant demo pipeline
-│   └── visualize_pose.py        # Skeleton GIF renderer
-│
-├── outputs/                     # Generated artefacts (tracked via Git LFS)
-│   ├── videos/                  # 7 render variants per clip
-│   │   ├── overlay/             # Skeleton on original frame
-│   │   ├── skeleton/            # Skeleton on black background
-│   │   ├── neon/                # Glowing neon skeleton
-│   │   ├── heatmap/             # Confidence heatmap blend
-│   │   ├── slowmo/              # 0.5x speed
-│   │   ├── studio/              # Dark gradient background
-│   │   └── mosaic/              # 3x2 tile of all variants
-│   ├── openpose_overlay/        # Original clips + skeleton overlay
-│   ├── openpose_json/           # Per-frame OpenPose-compatible JSON
-│   └── figures/                 # Notebook plots and animations
-│
-├── assets/                      # Model weights (tracked via Git LFS)
-│   └── holistic_landmarker.task # MediaPipe Holistic model (13 MB)
-│
-├── data/                        # Dataset metadata (CSV only, no videos)
-│   ├── labels.csv               # 2,216 clips with Arabic labels
-│   ├── splits.csv               # Train/val/test assignment per clip
-│   └── video_meta.csv           # fps, resolution, duration per clip
-│
-├── docs/                        # Methodology and decisions
-│   ├── DECISIONS.md             # Design decision log
-│   ├── MODEL.md                 # Architecture specification
-│   ├── PIPELINE.md              # End-to-end pipeline description
-│   ├── RESULTS.md               # Full evaluation results
-│   └── STATS.md                 # Dataset statistics
-│
-├── docker/                      # Container setup (NGC PyTorch 26.04)
-├── final_project.ipynb          # 45-cell research notebook (all stages)
-├── requirements.txt             # Python dependencies
-├── .gitattributes               # Git LFS tracking rules
-└── .gitignore
+├── assets/                         # Model weights (Git LFS)
+│   └── holistic_landmarker.task
+├── data/                           # Dataset metadata
+│   ├── labels.csv
+│   ├── splits.csv
+│   └── video_meta.csv
+├── datasets/                       # Dataset documentation and download instructions
+├── docs/                           # Technical documentation
+├── images/                         # Figures and visualizations (Git LFS)
+├── models/                         # Model files (Git LFS)
+├── mosl/                           # Python package
+│   ├── data/                       # Dataset loading and splitting
+│   ├── model/                      # SignLLM transformer
+│   ├── pose/                       # Keypoint extraction
+│   ├── text/                       # Arabic word tokenizer
+│   └── train/                      # Training loop, losses, evaluation
+├── notebooks/                      # Jupyter notebooks
+│   └── final_project.ipynb         # Full pipeline (67 cells)
+├── outputs/                        # All generated results
+│   ├── frames/                     # Per-frame JPEG exports (Git LFS)
+│   ├── openpose_json/              # Per-frame OpenPose 1.3 JSON keypoints
+│   └── videos/                     # All generated MP4 videos (Git LFS)
+│       ├── skeleton/               # Skeleton on black background
+│       ├── overlay/                # Skeleton on studio background
+│       ├── slowmo/                 # 3x slow-motion
+│       ├── heatmap/
+│       ├── mosaic/
+│       ├── neon/
+│       ├── studio/
+│       └── demo/                   # Per-sign demo outputs
+├── scripts/                        # CLI entry points
+│   └── generate_openpose/          # OpenPose-style video generator
+├── docker/                         # Docker environment for GPU pipeline
+├── final_project.ipynb             # Main notebook
+└── requirements.txt
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Clone with LFS objects
+### Generate OpenPose-style skeleton videos (no GPU required)
 
 ```bash
-git clone https://github.com/soufianeboulahcen/Master_Multimodal-Moroccan-SLG.git
-cd Master_Multimodal-Moroccan-SLG
-git lfs pull          # downloads videos, model weights, NPZ files
+pip install -r requirements.txt
+python scripts/generate_openpose/generate.py
 ```
 
-### 2. Install dependencies
+Outputs are written to `outputs/videos/`, `outputs/openpose_json/`, and `outputs/frames/`.
+
+Generate specific motions:
 
 ```bash
-pip install torch numpy opencv-python-headless mediapipe scipy matplotlib tqdm
+python scripts/generate_openpose/generate.py --motions walking dancing
+python scripts/generate_openpose/generate.py --no-frames --no-json   # videos only
 ```
 
-### 3. Run the OpenPose demo on any video
-
-```python
-import os, sys
-from pathlib import Path
-
-video = Path("/path/to/your/video.mp4").resolve()
-sys.argv = ["multi_openpose_demo.py", "--clips", str(video),
-            "--out-dir", "my_output"]
-import runpy
-runpy.run_path("scripts/multi_openpose_demo.py", run_name="__main__")
-```
-
-### 4. Open the research notebook
+### Run the notebook
 
 ```bash
-jupyter notebook final_project.ipynb
+jupyter notebook notebooks/final_project.ipynb
 ```
 
-### 5. Train SignLLM (requires Docker + GPU)
+### Full training pipeline (requires Docker + GPU + MoSL dataset)
 
 ```bash
-docker/run.sh python scripts/train_signllm.py --mode mse --run-name baseline_mse
-docker/run.sh bash scripts/run_ablation.sh   # all three ablation runs
+# Place MoSL dataset at data/vedios-dataset/
+docker/run.sh python scripts/extract_dataset.py
+docker/run.sh python scripts/train_signllm.py --run baseline_mse
+docker/run.sh python scripts/evaluate_runs.py
 ```
 
 ---
 
-## Pipeline Stages
-
-```
-Raw .mp4 videos (MoSL dataset)
-        |
-        v
-[Stage 1] Pose Extraction
-  mosl/pose/extract_dataset.py
-  pytorch-openpose per frame -> data/processed/keypoints_2d/*.npz
-        |
-        v
-[Stage 2] 2D -> 3D Lifting (Prompt2Sign)
-  mosl/pose/export_openpose_json.py
-  -> per-frame OpenPose JSON
-  -> Prompt2Sign pipeline (json2h5 -> h5totxt -> txt2skels)
-  -> final_data/{train,dev,test}.{skels,text,files}
-        |
-        v
-[Stage 3] SignLLM Training
-  scripts/train_signllm.py
-  Three loss modes: MSE / RL / RL+PLC
-  -> runs/<run_name>/best.pt
-        |
-        v
-[Stage 4] Evaluation
-  scripts/evaluate_runs.py      -> teacher-forced MSE + AR DTW
-  scripts/compute_baselines.py  -> NN / mean-pose / random-clip
-        |
-        v
-[Stage 5] OpenPose Video Generation
-  scripts/generate_openpose_video.py  -> overlay + skeleton + JSON
-  scripts/multi_openpose_demo.py      -> 7 variants + mosaic
-```
-
----
-
-## Generated Outputs
-
-### Video Variants (`outputs/videos/`)
-
-| Folder | Description | Background |
-|---|---|---|
-| `overlay/` | Skeleton on original frame | Original video |
-| `skeleton/` | Clean skeleton only | Pure black |
-| `neon/` | Glowing neon skeleton (Gaussian blur) | Pure black |
-| `heatmap/` | Confidence heatmap blended over original | Original video |
-| `slowmo/` | 0.5x speed (frame duplication) | Original video |
-| `studio/` | Skeleton on dark vignette gradient | Charcoal gradient |
-| `mosaic/` | 3x2 tile of all 6 variants | Combined |
-
-### JSON Keypoint Schema (`outputs/openpose_json/`)
-
-OpenPose-compatible per-frame JSON:
+## OpenPose JSON Format
 
 ```json
 {
   "version": 1.3,
-  "frame_index": 0,
-  "image_size": {"width": 460, "height": 460},
   "people": [{
-    "pose_keypoints_2d":       [x0,y0,c0, x1,y1,c1, ...],
-    "hand_left_keypoints_2d":  [x0,y0,c0, ...],
-    "hand_right_keypoints_2d": [x0,y0,c0, ...],
-    "face_keypoints_2d":       [x0,y0,c0, ...]
+    "person_id": [-1],
+    "pose_keypoints_2d":       [...],
+    "face_keypoints_2d":       [...],
+    "hand_left_keypoints_2d":  [...],
+    "hand_right_keypoints_2d": [...]
   }]
 }
 ```
 
-| Field | Joints | Values |
-|---|---|---|
-| `pose_keypoints_2d` | 18 COCO body joints | 54 |
-| `hand_*_keypoints_2d` | 21 hand joints each | 63 each |
-| `face_keypoints_2d` | 478 face mesh points | 1,434 |
+- **Body:** 25 keypoints (BODY_25), pixel coordinates at 1280x720
+- **Face:** 5 landmarks (eyes, mouth)
+- **Hands:** 11 keypoints per hand
+- **Confidence:** 1.0 for all generated keypoints
+
+---
+
+## Model Architecture
+
+```
+Arabic text -> WordTokenizer -> Encoder (2 layers, d=768, h=12)
+                                      |
+                              Decoder (2 layers, d=768, h=12)
+                                      |
+                          Linear -> (T, 150) pose sequence
+                                   [50 joints x (x, y, z)]
+```
+
+Parameters: ~35M | Optimizer: Adam + Noam LR (warmup=4000)
+
+![Positional encoding](images/positional_encoding.png)
 
 ---
 
 ## Dataset
 
-The **MoSL video dataset** is available at:
-[https://data.mendeley.com/datasets/23phgyt3mt/1](https://data.mendeley.com/datasets/23phgyt3mt/1)
+**MoSL — Moroccan Sign Language Video Dataset**
+Ben Zaid et al. (2026). Mendeley Data. DOI: [10.17632/23phgyt3mt.1](https://doi.org/10.17632/23phgyt3mt.1)
 
-| Category | Clips | Unique Signs |
-|---|---:|---:|
-| Diverse | 1,941 | 1,508 |
-| Numbers | 130 | 51 |
-| Letters | 71 | 39 |
-| days_months_seasons | 59 | 23 |
-| Pronouns | 15 | 10 |
-| **Total** | **2,216** | **1,631** |
+| Stat | Value |
+|------|-------|
+| Total clips | 2,216 |
+| Unique signs | 1,631 |
+| Train / Val / Test | 1,674 / 430 / 112 |
+| Singletons | 74% of signs have 1 clip |
 
-Raw `.mp4` files are **not included** (221 MB). Download from Mendeley and place under `data/vedios-dataset/`.
+Raw video files are not included. See `datasets/README.md` for download instructions.
 
 ---
 
 ## Git LFS
 
-This repository uses [Git LFS](https://git-lfs.github.com/) for large binary files:
-
-| Pattern | Content |
-|---|---|
-| `*.mp4` | Generated videos |
-| `*.task` | MediaPipe model weights |
-| `*.npz` | NumPy pose arrays |
-| `*.gif` | Skeleton animations |
-| `*.pt` | PyTorch checkpoints |
+Large binary files are tracked via Git LFS. After cloning:
 
 ```bash
-# Install Git LFS before cloning
-sudo apt-get install git-lfs   # Ubuntu/Debian
-brew install git-lfs           # macOS
-git lfs install
-
-# Clone (LFS files download automatically)
-git clone https://github.com/soufianeboulahcen/Master_Multimodal-Moroccan-SLG.git
+git lfs pull
 ```
+
+Tracked: `.mp4`, `.gif`, `.png`, `.jpg`, `.task`, `.npz`, `.pt`
 
 ---
 
-## Citation
+## References
 
-```bibtex
-@misc{fang2024signllm,
-  title         = {SignLLM: Sign Languages Production Large Language Models},
-  author        = {Fang, Sen and others},
-  year          = {2024},
-  eprint        = {2405.10718},
-  archivePrefix = {arXiv},
-}
-
-@data{benzaid2026mosl,
-  title     = {Moroccan Sign Language Video Dataset},
-  author    = {Ben Zaid and others},
-  year      = {2026},
-  publisher = {Mendeley Data},
-  doi       = {10.17632/23phgyt3mt.1},
-}
-```
+- Fang et al. (2024). *SignLLM: Sign Languages Production Large Language Models*. arXiv:2405.10718
+- Ben Zaid et al. (2026). *Moroccan Sign Language Video Dataset*. Mendeley Data
+- Vaswani et al. (2017). *Attention is All You Need*. NeurIPS 2017
+- Saunders et al. (2020). *Progressive Transformers for End-to-End Sign Language Production*. ECCV 2020
+- Hzzone (2019). *pytorch-openpose*. GitHub
 
 ---
 
 ## License
 
-[MIT](LICENSE)
+See [LICENSE](LICENSE).
