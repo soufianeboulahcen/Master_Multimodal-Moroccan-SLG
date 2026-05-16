@@ -44,8 +44,16 @@ Thumbs.db
 *.pem
 *.key
 
-# ── Loose notebook artefacts in root (canonical copies live in images/) ───────
-# PNGs and GIFs are tracked — do NOT ignore them globally.
-# Only ignore checkpoint/temp files:
+# ── Loose artefacts generated in repo root (canonical copies live in images/) ─
+# Ignore root-level PNGs/GIFs — they are notebook side-effects, not source files.
+# The organised copies in images/ ARE tracked.
+/*.png
+/*.gif
+
+# ── Intermediate generation directories ──────────────────────────────────────
+demo_output/
+outputs/figures/
+
+# ── Temp / backup files ───────────────────────────────────────────────────────
 *.tmp
 *.bak
