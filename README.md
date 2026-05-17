@@ -206,6 +206,102 @@ Tracked: `.mp4`, `.gif`, `.png`, `.jpg`, `.task`, `.npz`, `.pt`
 
 ---
 
+## Application Scenarios
+
+The pipeline combines OpenPose-based skeleton tracking, a Transformer encoder-decoder
+for sign language production, and a procedural avatar rendering engine. The techniques
+developed here address a broad set of real-world problems across accessibility,
+healthcare, HCI, and AI-driven media production.
+
+| # | Scenario | Core Capability Used |
+|---|----------|----------------------|
+| 1 | Assistive communication for the Deaf | Text → MoSL skeleton animation |
+| 2 | Sign language learning and Deaf education | Generation + DTW-based learner scoring |
+| 3 | Clinical rehabilitation and physical therapy | Marker-free joint tracking + DTW deviation |
+| 4 | Gesture-based human–computer interaction | 21-joint hand keypoint classification |
+| 5 | Avatar telepresence and virtual communication | Compact keypoint stream (150 floats/frame) |
+| 6 | Intelligent video surveillance | Skeleton-based anomaly detection |
+| 7 | Sports biomechanics and performance analysis | DTW scoring against reference trajectories |
+| 8 | AI animation and virtual production | Text → pose → avatar rendering |
+
+### 1. Assistive Communication for the Deaf and Hard-of-Hearing
+
+The primary application is **automatic sign language production**: given a written
+Arabic word or phrase, the system generates a temporally coherent skeleton animation
+that a Deaf user can read as a sign. Deployed as a browser or mobile widget, this
+enables public-sector services — government portals, hospital kiosks, educational
+platforms — to provide MoSL output at scale without requiring human interpreters.
+The MoSL dataset covers 1,631 isolated signs across five semantic categories,
+providing a practical lexical foundation for a signing assistant.
+
+### 2. Sign Language Learning and Deaf Education
+
+An avatar that renders any sign on demand is a natural component of an **interactive
+sign language tutor**. A learner types a word; the system generates the reference MoSL
+sign; the learner's webcam recording is scored by computing the DTW distance between
+their pose sequence and the model's output. This closes the loop between generation
+(SignLLM) and recognition (OpenPose extraction) in a single self-contained pedagogical
+tool, requiring no additional infrastructure beyond a webcam.
+
+### 3. Clinical Rehabilitation and Physical Therapy
+
+The 52-keypoint skeleton tracker (full body, both hands, face at 30 fps) enables
+**marker-free clinical motion analysis**. Physiotherapists can quantify range of
+motion, detect compensatory movement patterns, and track recovery progress over time
+without attaching physical markers to the patient. The DTW-based comparison metric
+used for sign evaluation transfers directly: a patient's recorded keypoint sequence is
+scored against a normative reference trajectory, yielding an objective deviation index
+per joint per session.
+
+### 4. Gesture-Based Human–Computer Interaction
+
+The 21-joint hand keypoint chains provide sufficient resolution to distinguish a
+vocabulary of static and dynamic hand gestures for **touchless interface control** in
+environments where physical contact is undesirable — operating theatres, cleanrooms,
+automotive dashboards, and public kiosks. A lightweight classifier trained on
+normalised keypoint sequences maps gestures to application commands, with the OpenPose
+extraction layer serving as a reusable front-end for any gesture-based HCI system.
+
+### 5. Avatar-Based Telepresence and Virtual Communication
+
+The rendering pipeline produces skeleton animations that can be mapped onto a rigged
+3D avatar for **real-time telepresence**. Transmitting a compact keypoint stream
+(150 floats per frame) instead of raw video reduces bandwidth by two to three orders
+of magnitude while preserving the gestural and postural information that carries
+communicative meaning — a property particularly valuable for Deaf users signing over
+a network connection.
+
+### 6. Intelligent Video Surveillance and Anomaly Detection
+
+Skeleton-based action recognition is invariant to clothing, lighting, and camera
+viewpoint in a way that pixel-level methods are not, making it well-suited to
+**intelligent surveillance**. The temporal pose sequences can be fed to a sequence
+classifier trained to detect anomalous activities (falls, intrusions, crowd crush).
+The procedural motion generators in Section 11 provide a controlled source of
+synthetic training data for rare events that cannot be collected from real footage.
+
+### 7. Sports Biomechanics and Athletic Performance Analysis
+
+High-speed pose estimation enables **objective, marker-free biomechanical analysis**
+of athletic movement. Coaches can measure joint angles, stride length, arm swing
+symmetry, and centre-of-mass displacement across sessions, identifying technique
+deviations that correlate with injury risk or performance loss. The DTW metric
+provides a single interpretable performance index by comparing an athlete's attempt
+against a stored reference motion (e.g., an elite sprinter's stride cycle).
+
+### 8. AI Animation and Virtual Production
+
+The pose-to-avatar pipeline is a lightweight alternative to optical motion capture
+for **AI-driven animation**. A director describes a motion in natural language; a
+language model translates the description into pose keyframes; the rendering engine
+produces a preview in seconds rather than the hours required by traditional keyframe
+animation. The SignLLM architecture — which maps text tokens to pose sequences —
+transfers directly to this broader motion synthesis task by replacing the sign
+vocabulary with a motion vocabulary and retraining on a motion-captioned dataset
+such as HumanML3D or BABEL.
+
+---
+
 ## References
 
 - Fang et al. (2024). *SignLLM: Sign Languages Production Large Language Models*. arXiv:2405.10718
