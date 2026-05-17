@@ -1,6 +1,0 @@
-# MoSL OpenPose Demo — application dependencies
-# Install: pip install -r app_requirements.txt
-
-streamlit>=1.35.0
-opencv-python-headless>=4.9.0
-numpy>=1.24.0

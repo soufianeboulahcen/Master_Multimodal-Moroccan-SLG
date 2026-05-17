@@ -1,0 +1,19 @@
+services:
+  mosl-app:
+    name: MoSL OpenPose Demo
+    description: Streamlit application for sign language pose estimation
+    commands:
+      start: |
+        cd /workspaces/codespaces_project_web4jobs
+        python3 -m venv venv --system-site-packages 2>/dev/null || true
+        venv/bin/pip install --quiet streamlit opencv-python-headless numpy 2>/dev/null || true
+        venv/bin/streamlit run app.py \
+          --server.port 8501 \
+          --server.headless true \
+          --server.address 0.0.0.0 \
+          --browser.gatherUsageStats false \
+          --server.enableCORS false \
+          --server.enableXsrfProtection false
+      stop: pkill -f "streamlit run app.py" || true
+    ready_on:
+      port: 8501
