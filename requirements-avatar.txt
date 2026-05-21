@@ -1,0 +1,60 @@
+# Avatar rendering subsystem dependencies
+# Install on top of the existing project environment (requirements.txt).
+#
+# The base NGC PyTorch 26.04-py3 image already provides:
+#   torch, torchvision, numpy, scipy, opencv, tqdm, matplotlib
+# Only the diffusion stack and identity conditioning deps are listed here.
+#
+# Install:
+#   pip install -r requirements-avatar.txt
+#
+# For the DGX Spark (aarch64 + CUDA 13), all packages below have
+# compatible wheels.  xformers may require a source build if the
+# pre-built wheel does not match the CUDA version:
+#   pip install xformers --no-build-isolation
+
+# ── Diffusion core ────────────────────────────────────────────────────
+diffusers>=0.27.0
+transformers>=4.40.0
+accelerate>=0.29.0
+safetensors>=0.4.3
+
+# ── ControlNet conditioning ───────────────────────────────────────────
+# OpenposeDetector and DWposeDetector for pose map preprocessing.
+controlnet-aux>=0.0.7
+
+# ── Identity conditioning ─────────────────────────────────────────────
+# InsightFace: ArcFace face detection + 512-d embedding (InstantID).
+insightface>=0.7.3
+onnxruntime-gpu>=1.17.0        # InsightFace ONNX backend (GPU)
+# onnxruntime>=1.17.0          # CPU fallback — uncomment if no GPU
+
+# ── Video I/O ─────────────────────────────────────────────────────────
+imageio[ffmpeg]>=2.34.0        # frame → MP4 encoding
+av>=12.0.0                     # PyAV for low-level video I/O
+
+# ── Memory-efficient attention ────────────────────────────────────────
+# Halves VRAM usage for SDXL attention layers.
+# Pre-built wheels: https://github.com/facebookresearch/xformers/releases
+xformers>=0.0.25
+
+# ── Utilities ─────────────────────────────────────────────────────────
+einops>=0.7.0                  # tensor rearrangement (used by AnimateDiff)
+omegaconf>=2.3.0               # config management (used by MimicMotion)
+Pillow>=10.0.0                 # image I/O
+
+# ── HuggingFace Hub ───────────────────────────────────────────────────
+huggingface-hub>=0.22.0        # model weight downloads
+
+# ── MimicMotion (install separately from source) ──────────────────────
+# MimicMotion is not on PyPI.  Install from GitHub:
+#   pip install git+https://github.com/tencent/MimicMotion.git
+# or clone and add to PYTHONPATH:
+#   git clone https://github.com/tencent/MimicMotion third_party/MimicMotion
+
+# ── RIFE interpolation (install separately from source) ───────────────
+# Option A (recommended):
+#   pip install practical-rife
+# Option B:
+#   git clone https://github.com/hzwer/Practical-RIFE third_party/RIFE
+#   Download weights from the RIFE releases page into third_party/RIFE/train_log/
