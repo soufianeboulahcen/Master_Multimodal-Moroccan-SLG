@@ -1,0 +1,56 @@
+# avatar_generator configuration
+# Load with: GeneratorConfig.from_yaml("avatar_generator/config.yaml")
+# All values shown are defaults.
+
+# ── Model IDs ────────────────────────────────────────────────────────
+base_model_id: "stabilityai/stable-diffusion-xl-base-1.0"
+controlnet_id: "thibaud/controlnet-openpose-sdxl-1.0"
+ip_adapter_model_id: "h94/IP-Adapter"
+ip_adapter_subfolder: "sdxl_models"
+ip_adapter_weight_name: "ip-adapter-plus-face_sdxl_vit-h.bin"
+
+# ── Output resolution ────────────────────────────────────────────────
+width: 768
+height: 768
+
+# ── Diffusion sampling ───────────────────────────────────────────────
+num_steps: 25
+guidance_scale: 7.5
+controlnet_conditioning_scale: 0.85
+# Set to 0.0 to disable identity conditioning (no reference image needed)
+identity_strength: 0.40
+negative_prompt: "blurry, low quality, deformed hands, extra fingers, missing fingers, bad anatomy, watermark, text, ugly, cartoon, anime"
+
+# ── Prompt ───────────────────────────────────────────────────────────
+default_prompt: "a person performing sign language, photorealistic, high quality, detailed hands and fingers, studio lighting, neutral background, 4k"
+
+# ── Pose map rendering ───────────────────────────────────────────────
+pose_source_width: 1280
+pose_source_height: 720
+hand_supersample: true
+pose_confidence_threshold: 0.1
+
+# ── Video assembly ───────────────────────────────────────────────────
+output_fps: 25
+output_codec: "libx264"
+output_crf: 18
+
+# ── Hardware ─────────────────────────────────────────────────────────
+device: "cuda"
+torch_dtype: "float16"
+enable_xformers: true
+enable_vae_slicing: true
+cpu_offload: false
+
+# ── Reproducibility ──────────────────────────────────────────────────
+seed: 42
+
+# ── Output options ───────────────────────────────────────────────────
+# Also save individual PNG frames alongside the video
+save_frames: false
+frames_subdir: "frames"
+
+# ── .skels format ────────────────────────────────────────────────────
+skels_joints: 50
+skels_canvas_width: 1280
+skels_canvas_height: 720
