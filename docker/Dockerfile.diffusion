@@ -1,0 +1,77 @@
+# Diffusion stack extension for the MoSL avatar generation pipeline.
+#
+# Extends the base pfe-pose:latest image (docker/Dockerfile) with the
+# HuggingFace diffusers stack, ControlNet, AnimateDiff, and IP-Adapter.
+#
+# Build:
+#   docker build -t pfe-avatar:latest -f docker/Dockerfile.diffusion .
+#
+# Run (same convention as docker/run.sh):
+#   docker run --rm -it --gpus all --shm-size=16g \
+#       -u $(id -u):$(id -g) \
+#       -v $PROJECT_ROOT:/workspace/PFE-SOUFIAN \
+#       -w /workspace/PFE-SOUFIAN \
+#       pfe-avatar:latest bash
+#
+# Notes:
+#   - shm-size increased to 16g (AnimateDiff loads multiple large models)
+#   - Model weights are NOT baked into the image — they are downloaded at
+#     runtime via scripts/avatar/download_models.py and cached in
+#     ~/.cache/huggingface/hub (bind-mount or Docker volume recommended)
+#   - xformers is installed for memory-efficient attention (~30% VRAM saving)
+
+FROM pfe-pose:latest
+
+# ── Core diffusion stack ──────────────────────────────────────────────────
+# Pin versions for reproducibility. Tested on NGC PyTorch 26.04-py3
+# (PyTorch 2.4, CUDA 13, Python 3.12, aarch64 + x86_64).
+RUN pip install --no-cache-dir \
+    diffusers==0.30.3 \
+    transformers==4.44.2 \
+    accelerate==0.34.2 \
+    tokenizers==0.19.1 \
+    safetensors==0.4.5 \
+    huggingface_hub==0.25.2
+
+# ── ControlNet auxiliary processors ──────────────────────────────────────
+# controlnet-aux provides the OpenPose preprocessor used by ControlNet
+# (DWPose body+hand+face detector). We use it as a reference for the
+# colour palette but our pose maps come from pose_to_controlnet_map.py.
+RUN pip install --no-cache-dir \
+    controlnet-aux==0.0.9 \
+    mediapipe==0.10.14
+
+# ── AnimateDiff + video utilities ─────────────────────────────────────────
+RUN pip install --no-cache-dir \
+    einops==0.8.0 \
+    omegaconf==2.3.0 \
+    imageio==2.35.1 \
+    imageio-ffmpeg==0.5.1 \
+    av==13.1.0
+
+# ── Identity preservation ─────────────────────────────────────────────────
+# InsightFace for InstantID (optional — IP-Adapter works without it)
+RUN pip install --no-cache-dir \
+    insightface==0.7.3 \
+    onnxruntime-gpu==1.19.2
+
+# ── Memory-efficient attention ────────────────────────────────────────────
+# xformers: pre-built wheel for the NGC PyTorch version.
+# If the wheel is not available for this exact torch version, the install
+# will fail silently (|| true) and diffusers falls back to standard attention.
+RUN pip install --no-cache-dir xformers || true
+
+# ── Optional upscaler ─────────────────────────────────────────────────────
+# Real-ESRGAN for post-generation upscaling (--upscale flag).
+# basicsr is the underlying framework.
+RUN pip install --no-cache-dir \
+    basicsr==1.4.2 \
+    realesrgan==0.3.0 || true
+
+# ── Verify core imports ───────────────────────────────────────────────────
+RUN python -c "import diffusers; import transformers; import accelerate; \
+    print('diffusers', diffusers.__version__); \
+    print('transformers', transformers.__version__); \
+    print('accelerate', accelerate.__version__)"
+
+WORKDIR /workspace/PFE-SOUFIAN
