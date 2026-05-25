@@ -49,15 +49,16 @@ sys.path.insert(0, str(ROOT / "scripts" / "avatar"))
 
 DEFAULTS = {
     # AnimateDiff
-    "window_size":     16,
-    "window_overlap":  4,
-    "num_steps":       25,
-    "guidance_scale":  7.5,
-    "controlnet_scale": 0.75,
+    "window_size":      16,
+    "window_overlap":   4,
+    "num_steps":        25,
+    "guidance_scale":   7.0,    # CFG=7 per spec
+    "denoise_strength": 0.7,    # img2img denoising strength per spec
+    "controlnet_scale": 0.9,    # ControlNet weight=0.9 per spec
     "ip_adapter_scale": 0.65,
-    "width":           512,
-    "height":          768,
-    "fps_out":         25,
+    "width":            512,
+    "height":           768,
+    "fps_out":          24,     # 24 fps per spec
     # SVD
     "motion_bucket_id": 110,
     "noise_aug":        0.02,
@@ -67,7 +68,8 @@ DEFAULTS = {
 NEGATIVE_PROMPT = (
     "blurry, deformed hands, extra fingers, missing fingers, distorted face, "
     "low quality, cartoon, anime, painting, watermark, text, logo, "
-    "multiple people, crowd, nsfw"
+    "multiple people, crowd, nsfw, duplicate limbs, temporal artifacts, "
+    "flickering, unrealistic anatomy, fake skin, plastic skin"
 )
 
 
@@ -352,12 +354,20 @@ def main() -> int:
                    help="Number of frames to generate (0 = all pose maps)")
     p.add_argument("--width",  type=int, default=DEFAULTS["width"])
     p.add_argument("--height", type=int, default=DEFAULTS["height"])
-    p.add_argument("--fps",    type=int, default=DEFAULTS["fps_out"])
+    p.add_argument("--fps",    type=int, default=DEFAULTS["fps_out"],
+                   help=f"Output FPS (default: {DEFAULTS['fps_out']})")
     p.add_argument("--steps",  type=int, default=DEFAULTS["num_steps"])
     p.add_argument("--cfg",    type=float, default=DEFAULTS["guidance_scale"],
-                   dest="guidance_scale")
+                   dest="guidance_scale",
+                   help=f"CFG scale (default: {DEFAULTS['guidance_scale']})")
+    p.add_argument("--denoise-strength", type=float,
+                   default=DEFAULTS["denoise_strength"],
+                   help=f"Denoising strength for img2img mode "
+                        f"(default: {DEFAULTS['denoise_strength']})")
     p.add_argument("--controlnet-scale", type=float,
-                   default=DEFAULTS["controlnet_scale"])
+                   default=DEFAULTS["controlnet_scale"],
+                   help=f"ControlNet conditioning weight "
+                        f"(default: {DEFAULTS['controlnet_scale']})")
     p.add_argument("--ip-scale", type=float, default=DEFAULTS["ip_adapter_scale"])
     p.add_argument("--seed",   type=int, default=42)
     p.add_argument("--upscale", action="store_true",
@@ -371,14 +381,15 @@ def main() -> int:
     dtype = dtype_map[args.dtype]
 
     cfg = {
-        "window_size":     DEFAULTS["window_size"],
-        "window_overlap":  DEFAULTS["window_overlap"],
-        "num_steps":       args.steps,
-        "guidance_scale":  args.guidance_scale,
+        "window_size":      DEFAULTS["window_size"],
+        "window_overlap":   DEFAULTS["window_overlap"],
+        "num_steps":        args.steps,
+        "guidance_scale":   args.guidance_scale,
+        "denoise_strength": args.denoise_strength,
         "controlnet_scale": args.controlnet_scale,
         "ip_adapter_scale": args.ip_scale,
-        "width":           args.width,
-        "height":          args.height,
+        "width":            args.width,
+        "height":           args.height,
         "motion_bucket_id": DEFAULTS["motion_bucket_id"],
         "noise_aug":        DEFAULTS["noise_aug"],
         "decode_chunk":     DEFAULTS["decode_chunk"],

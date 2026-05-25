@@ -47,7 +47,16 @@ RUN pip install --no-cache-dir \
     omegaconf==2.3.0 \
     imageio==2.35.1 \
     imageio-ffmpeg==0.5.1 \
-    av==13.1.0
+    av==13.1.0 \
+    opencv-python-headless==4.10.0.84
+
+# ── RIFE frame interpolation ──────────────────────────────────────────────
+# Clone Practical-RIFE into models/rife/ for the postprocess.py RIFE path.
+# The model weights are downloaded at runtime by postprocess.py.
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 https://github.com/hzwer/Practical-RIFE.git \
+    /workspace/PFE-SOUFIAN/models/rife 2>/dev/null || true
 
 # ── Identity preservation ─────────────────────────────────────────────────
 # InsightFace for InstantID (optional — IP-Adapter works without it)
@@ -64,14 +73,20 @@ RUN pip install --no-cache-dir xformers || true
 # ── Optional upscaler ─────────────────────────────────────────────────────
 # Real-ESRGAN for post-generation upscaling (--upscale flag).
 # basicsr is the underlying framework.
+# facexlib and gfpgan are required by realesrgan's dependency chain.
 RUN pip install --no-cache-dir \
+    facexlib==0.3.0 \
+    gfpgan==1.3.8 \
     basicsr==1.4.2 \
     realesrgan==0.3.0 || true
 
 # ── Verify core imports ───────────────────────────────────────────────────
 RUN python -c "import diffusers; import transformers; import accelerate; \
+    import cv2; import imageio; \
     print('diffusers', diffusers.__version__); \
     print('transformers', transformers.__version__); \
-    print('accelerate', accelerate.__version__)"
+    print('accelerate', accelerate.__version__); \
+    print('cv2', cv2.__version__); \
+    print('imageio', imageio.__version__)"
 
 WORKDIR /workspace/PFE-SOUFIAN

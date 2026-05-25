@@ -8,14 +8,73 @@ It does **not** replace any existing code — it layers on top of it.
 
 ---
 
+## 0. Quick start — OpenPose video → avatar (new)
+
+The fastest path from an existing skeleton video to a cinematic avatar:
+
+```bash
+# Build the diffusion image (once)
+docker build -t pfe-avatar:latest -f docker/Dockerfile.diffusion .
+
+# Single video — skeleton MP4 → avatar MP4
+docker/run_avatar.sh python scripts/avatar/video_to_avatar.py \
+    --input  outputs/videos/skeleton/walking_skeleton.mp4 \
+    --reference assets/avatar_reference.jpg \
+    --prompt "a Moroccan man performing sign language, studio background, \
+              photorealistic, DSLR, cinematic lighting" \
+    --out    outputs/avatar/videos/walking_hq.mp4 \
+    --interpolate --target-fps 24 \
+    --upscale
+
+# From JSON keypoints (cleaner pose maps, preferred)
+docker/run_avatar.sh python scripts/avatar/video_to_avatar.py \
+    --input  outputs/openpose_json/walking_keypoints/ \
+    --source json \
+    --reference assets/avatar_reference.jpg \
+    --prompt "a Moroccan man performing sign language, photorealistic" \
+    --out    outputs/avatar/videos/walking_hq.mp4
+
+# Batch — all skeleton videos at once
+docker/run_avatar.sh python scripts/avatar/video_to_avatar.py \
+    --input  outputs/videos/skeleton/ \
+    --batch \
+    --reference assets/avatar_reference.jpg \
+    --prompt "a Moroccan signer, photorealistic, studio background" \
+    --out-dir outputs/avatar/videos/batch/
+```
+
+The pipeline runs three stages automatically:
+
+| Stage | Script | What it does |
+|---|---|---|
+| 1 | `video_to_pose_maps.py` | Extract ControlNet PNG pose maps from the video |
+| 2 | `generate_avatar_video.py` | AnimateDiff + SDXL + ControlNet + IP-Adapter |
+| 3 | `postprocess.py` | RIFE interpolation + Real-ESRGAN upscale |
+
+Each stage can be skipped independently (`--skip-pose`, `--skip-generation`,
+`--skip-postprocess`) to resume after a partial run.
+
+### Recommended generation settings (per spec)
+
+| Parameter | Value | Flag |
+|---|---|---|
+| FPS | 24 | `--fps 24` |
+| CFG scale | 7.0 | `--cfg 7` |
+| Denoise strength | 0.7 | `--denoise-strength 0.7` |
+| ControlNet weight | 0.9 | `--controlnet-scale 0.9` |
+| IP-Adapter scale | 0.65 | `--ip-scale 0.65` |
+| Frame count | 24–48 | `--n-frames 48` |
+
+---
+
 ## 1. What already exists (assets we reuse)
 
 | Asset | Location | Format | Role in new pipeline |
 |---|---|---|---|
-| Per-frame OpenPose JSON | `data/processed/openpose_json/` | CMU v1.3 JSON | ControlNet conditioning input |
+| Per-frame OpenPose JSON | `outputs/openpose_json/` | CMU v1.3 JSON | ControlNet conditioning input |
 | Per-clip NPZ keypoints | `data/processed/keypoints_2d/` | `(T,54)+(T,63)×2` float32 | Pose sequence source |
+| Skeleton videos | `outputs/videos/skeleton/` | MP4 30fps | Direct video input (new) |
 | Procedural skeleton frames | `outputs/frames/*/` | JPEG 1280×720 | ControlNet conditioning (no-GPU path) |
-| Procedural skeleton videos | `outputs/videos/skeleton/` | MP4 30fps | Reference motion clips |
 | SignLLM predicted poses | `predictions/*.npz` | `(T,150)` float32 | Generated motion → avatar |
 | Skeleton renderer | `scripts/generate_openpose/renderer.py` | Python/OpenCV | Pose-map image generator |
 | Rig definition | `scripts/generate_openpose/rig.py` | Python/numpy | Keypoint topology |
@@ -37,6 +96,12 @@ OpenPose needs. The only missing piece is the diffusion model stack on top.
 │  OR  procedural motions (motions.py)  ──► keypoints (T,52,2)       │
 │                                                                     │
 │  OR  real MoSL video  ──► pytorch-openpose  ──► keypoints NPZ      │
+│                                                                     │
+│  OR  existing skeleton MP4  ──────────────────────────────────────► │
+│      outputs/videos/skeleton/*.mp4   (video_to_pose_maps.py)        │
+│                                                                     │
+│  OR  existing JSON keypoints  ────────────────────────────────────► │
+│      outputs/openpose_json/*/        (video_to_pose_maps.py)        │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
                                ▼
@@ -341,10 +406,12 @@ This is implemented in `scripts/avatar/generate_avatar_video.py` via the
 
 ```
 scripts/avatar/
-├── pose_to_controlnet_map.py   # keypoints → RGB pose-map images
-├── generate_avatar_video.py    # main AnimateDiff generation driver
+├── pose_to_controlnet_map.py   # keypoints (NPZ/procedural) → RGB pose-map images
+├── video_to_pose_maps.py       # skeleton MP4 / JSON dir → RGB pose-map images (NEW)
+├── generate_avatar_video.py    # AnimateDiff / SVD generation driver
 ├── identity_encoder.py         # IP-Adapter / InstantID face embedding
-└── postprocess.py              # RIFE interpolation + Real-ESRGAN upscale
+├── postprocess.py              # RIFE interpolation + Real-ESRGAN upscale (NEW)
+└── video_to_avatar.py          # end-to-end pipeline runner (NEW)
 
 outputs/
 └── avatar/
@@ -353,7 +420,22 @@ outputs/
     └── videos/                 # final MP4 avatar videos
 
 docker/
-└── Dockerfile.diffusion        # extended image with diffusers stack
+└── Dockerfile.diffusion        # extended image with diffusers + RIFE + Real-ESRGAN
+```
+
+### New input paths
+
+```
+Existing asset                     New script                  Output
+──────────────────────────────────────────────────────────────────────────
+outputs/videos/skeleton/*.mp4      video_to_pose_maps.py       outputs/avatar/pose_maps/<name>/
+outputs/openpose_json/*_keypoints/ video_to_pose_maps.py       outputs/avatar/pose_maps/<name>/
+                                          │
+                                          ▼
+                                   video_to_avatar.py  (orchestrates all 3 stages)
+                                          │
+                                          ▼
+                                   outputs/avatar/videos/<name>_avatar.mp4
 ```
 
 ### Integration points
